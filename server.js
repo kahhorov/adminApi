@@ -43,6 +43,7 @@ app.post("/send-message", async (req, res) => {
           [
             { text: "✅ Bajarilgan", callback_data: `done:${order.id}` },
             { text: "❌ Bajarilmagan", callback_data: `fail:${order.id}` },
+            { text: "🛑 Bekor qilindi", callback_data: `cancel:${order.id}` },
           ],
         ],
       },
@@ -87,11 +88,17 @@ async function getUpdates() {
           const [action, orderId] = update.callback_query.data.split(":");
           const chat_id = update.callback_query.message.chat.id;
 
-          const order = orders.find((o) => o.id == orderId);
-          if (!order) continue;
+          const orderIndex = orders.findIndex((o) => o.id == orderId);
+          if (orderIndex === -1) continue;
+          const order = orders[orderIndex];
 
           if (action === "done") order.status = "bajarilgan";
           if (action === "fail") order.status = "bajarilmagan";
+          if (action === "cancel") {
+            order.status = "bekor qilindi";
+            // Buyurtmani o'chirish
+            orders.splice(orderIndex, 1);
+          }
 
           await fetch(`${TELEGRAM_API}/sendMessage`, {
             method: "POST",
@@ -101,7 +108,9 @@ async function getUpdates() {
               text: `Status o'zgartirildi: ${
                 order.status === "bajarilgan"
                   ? "✅ Bajarilgan"
-                  : "❌ Bajarilmagan"
+                  : order.status === "bajarilmagan"
+                  ? "❌ Bajarilmagan"
+                  : "🛑 Bekor qilindi"
               }`,
             }),
           });
