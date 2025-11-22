@@ -16,7 +16,7 @@ let orders = [];
 app.post("/send-message", async (req, res) => {
   try {
     const { chat_id, username, password, follows } = req.body;
-    if (!chat_id) return res.json({ success: false, error: "chat_id yo‘q!" });
+    if (!chat_id) return res.json({ success: false, error: "chat_id yo'q!" });
 
     const order = {
       id: Date.now(),
@@ -98,7 +98,7 @@ async function getUpdates() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id,
-              text: `Status o‘zgartirildi: ${
+              text: `Status o'zgartirildi: ${
                 order.status === "bajarilgan"
                   ? "✅ Bajarilgan"
                   : "❌ Bajarilmagan"
