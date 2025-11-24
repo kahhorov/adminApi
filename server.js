@@ -146,7 +146,7 @@ async function getUpdates() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id,
-              text: `Salom ${user_name}! Sizning unikal linkingiz: \n\n${link}`,
+              text: `Salom ${user_name}! Sizning linkingiz: \n\n${link}`,
             }),
           });
         }
